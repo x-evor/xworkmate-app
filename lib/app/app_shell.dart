@@ -1,0 +1,307 @@
+import 'package:flutter/material.dart';
+
+import '../features/account/account_page.dart';
+import '../features/assistant/assistant_page.dart';
+import '../features/mobile/ios_mobile_shell.dart';
+import '../features/modules/modules_page.dart';
+import '../features/secrets/secrets_page.dart';
+import '../features/settings/settings_page.dart';
+import '../features/tasks/tasks_page.dart';
+import '../models/app_models.dart';
+import '../theme/app_palette.dart';
+import '../widgets/detail_drawer.dart';
+import '../widgets/sidebar_navigation.dart';
+import 'app_controller.dart';
+
+class AppShell extends StatelessWidget {
+  const AppShell({super.key, required this.controller});
+
+  final AppController controller;
+  static const _mobileDestinations = [
+    WorkspaceDestination.assistant,
+    WorkspaceDestination.tasks,
+    WorkspaceDestination.modules,
+    WorkspaceDestination.secrets,
+    WorkspaceDestination.settings,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return Scaffold(
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final palette = context.palette;
+                final isIosCompact =
+                    Theme.of(context).platform == TargetPlatform.iOS &&
+                    constraints.maxWidth < 900;
+                final isMobile = constraints.maxWidth < 900;
+                final collapsed =
+                    !controller.sidebarExpanded || constraints.maxWidth < 1120;
+                final showPinnedDetail =
+                    controller.detailPanel != null &&
+                    constraints.maxWidth > 1460;
+                final mobileDestination =
+                    controller.destination == WorkspaceDestination.account
+                    ? WorkspaceDestination.assistant
+                    : controller.destination;
+
+                void openMobileDetail(DetailPanelData detail) {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (sheetContext) {
+                      return FractionallySizedBox(
+                        heightFactor: 0.92,
+                        child: DetailSheet(
+                          data: detail,
+                          onClose: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      );
+                    },
+                  );
+                }
+
+                void openAccountSheet() {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (sheetContext) {
+                      return Container(
+                        margin: EdgeInsets.fromLTRB(
+                          12,
+                          MediaQuery.of(sheetContext).padding.top + 12,
+                          12,
+                          12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.surfacePrimary,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: palette.strokeSoft),
+                        ),
+                          child: SafeArea(
+                            top: false,
+                            child: AccountPage(controller: controller),
+                          ),
+                      );
+                    },
+                  );
+                }
+
+                if (isIosCompact) {
+                  return IosMobileShell(controller: controller);
+                }
+
+                if (isMobile) {
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _AmbientBackground(palette: palette),
+                      ),
+                      Column(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  color: palette.canvas.withValues(alpha: 0.18),
+                                  child: _pageForDestination(
+                                    mobileDestination,
+                                    openMobileDetail,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: NavigationBar(
+                                selectedIndex: _mobileDestinations.indexOf(
+                                  mobileDestination,
+                                ),
+                                onDestinationSelected: (index) {
+                                  controller.navigateTo(
+                                    _mobileDestinations[index],
+                                  );
+                                },
+                                destinations: _mobileDestinations
+                                    .map(
+                                      (destination) => NavigationDestination(
+                                        icon: Icon(destination.icon),
+                                        label: destination.label,
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Positioned(
+                        right: 24,
+                        bottom: 96,
+                        child: FloatingActionButton.small(
+                          onPressed: openAccountSheet,
+                          child: const Icon(Icons.account_circle_rounded),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _AmbientBackground(palette: palette),
+                    ),
+                    Row(
+                      children: [
+                        SidebarNavigation(
+                          currentSection: controller.destination,
+                          isCollapsed: collapsed,
+                          themeMode: controller.themeMode,
+                          onSectionChanged: controller.navigateTo,
+                          onToggleCollapsed: controller.toggleSidebar,
+                          onOpenAccount: () => controller.navigateTo(
+                            WorkspaceDestination.account,
+                          ),
+                          onOpenThemeToggle: () => controller.setThemeMode(
+                            controller.themeMode == ThemeMode.dark
+                                ? ThemeMode.light
+                                : ThemeMode.dark,
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              top: 16,
+                              right: 16,
+                              bottom: 16,
+                            ),
+                            child: AnimatedPadding(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              padding: EdgeInsets.only(
+                                right: showPinnedDetail ? 392 : 0,
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
+                                child: Container(
+                                  color: palette.canvas.withValues(alpha: 0.16),
+                                  child: _buildCurrentPage(controller.openDetail),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (controller.detailPanel != null && !showPinnedDetail)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: controller.closeDetail,
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.12),
+                          ),
+                        ),
+                      ),
+                    if (controller.detailPanel != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: DetailDrawer(
+                          data: controller.detailPanel!,
+                          onClose: controller.closeDetail,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCurrentPage(ValueChanged<DetailPanelData> onOpenDetail) {
+    return IndexedStack(
+      index: controller.destination.index,
+      children: WorkspaceDestination.values
+          .map((destination) => _pageForDestination(destination, onOpenDetail))
+          .toList(),
+    );
+  }
+
+  Widget _pageForDestination(
+    WorkspaceDestination destination,
+    ValueChanged<DetailPanelData> onOpenDetail,
+  ) {
+    return switch (destination) {
+      WorkspaceDestination.assistant => AssistantPage(
+        controller: controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.tasks => TasksPage(
+        controller: controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.modules => ModulesPage(
+        controller: controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.secrets => SecretsPage(
+        controller: controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.settings => SettingsPage(controller: controller),
+      WorkspaceDestination.account => AccountPage(controller: controller),
+    };
+  }
+}
+
+class _AmbientBackground extends StatelessWidget {
+  const _AmbientBackground({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          top: -120,
+          right: -80,
+          child: Container(
+            width: 340,
+            height: 340,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: palette.accent.withValues(alpha: 0.07),
+            ),
+          ),
+        ),
+        Positioned(
+          left: -120,
+          bottom: -180,
+          child: Container(
+            width: 380,
+            height: 380,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: palette.success.withValues(alpha: 0.05),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

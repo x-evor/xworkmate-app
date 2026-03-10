@@ -1,0 +1,8 @@
+{
+  "name": "xworkmate",
+  "private": true,
+  "scripts": {
+    "desktop:package:mac": "bash scripts/package-flutter-mac-app.sh",
+    "desktop:install:mac": "bash scripts/package-flutter-mac-app.sh && bash scripts/install-flutter-mac-dmg.sh"
+  }
+}
